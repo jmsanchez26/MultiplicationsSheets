@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Times Table Sheets</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800&family=Inter:wght@500;600&family=Poppins:wght@600&family=Questrial&display=swap">
+<style>
+/* Layout: left sheet navigator (collapsible) + scrollable paper with a floating pen toolbar. */
+:root {
+  --bg: #e6e9ef;
+  --panel: #f6f7fa;
+  --fg: #1c2330;
+  --muted: #5d6779;
+  --line: #cfd5df;
+  --accent: #0f766e;
+  --accent-fg: #ffffff;
+  --paper: #ffffff;
+  --ink: #1a1a1a;
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sheet: "Nunito", "Avenir Next", system-ui, sans-serif;
+  --font-num: "Questrial", "Century Gothic", "Avenir Next", Helvetica, Arial, sans-serif;
+  --font-title: "Poppins", "Century Gothic", Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171d; --panel: #1d2129; --fg: #e8ebf1; --muted: #98a2b3; --line: #313846;
+    --accent: #2dd4bf; --accent-fg: #06201d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171d; --panel: #1d2129; --fg: #e8ebf1; --muted: #98a2b3; --line: #313846;
+  --accent: #2dd4bf; --accent-fg: #06201d; color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 var(--font-ui);
+  overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app { display: flex; height: 100%; width: 100%; }
+
+/* ---------- navigator ---------- */
+.nav {
+  flex: none; width: 232px; background: var(--panel); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; transition: margin-left .25s ease;
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.app.nav-hidden .nav { margin-left: calc(-232px - env(safe-area-inset-left, 0px)); }
+.nav-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px 16px; }
+.nav-head h1 { font: 800 17px var(--font-sheet); margin: 0; letter-spacing: .01em; }
+.nav-list { flex: 1; overflow-y: auto; padding: 4px 12px 16px; display: flex; flex-direction: column; gap: 10px; -webkit-overflow-scrolling: touch; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px; text-align: left; width: 100%;
+  background: transparent; border: 2px solid transparent; border-radius: 10px; padding: 8px;
+}
+.nav-item[aria-current="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.thumb { position: relative; flex: none; width: 100px; height: 71px; background: #fff; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.thumb .sheet { position: absolute; left: 0; top: 0; transform: scale(.089); transform-origin: 0 0; pointer-events: none; }
+.nav-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nav-label b { font: 800 22px var(--font-sheet); }
+.nav-label span { font-size: 12px; color: var(--muted); }
+.inked { color: var(--accent); font-weight: 600; }
+
+/* ---------- main ---------- */
+.main { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
+.toolbar {
+  position: absolute; z-index: 5; top: calc(10px + env(safe-area-inset-top, 0px));
+  left: 10px; right: max(10px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none;
+}
+.group {
+  pointer-events: auto; display: flex; gap: 4px; align-items: center; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.14);
+}
+.btn {
+  min-width: 44px; height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 14px;
+}
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn.warn[data-armed="true"] { background: #c2410c; color: #fff; }
+.btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.swatch { width: 44px; height: 44px; border-radius: 10px; border: 0; background: transparent; display: grid; place-items: center; }
+.swatch i { width: 26px; height: 26px; border-radius: 50%; background: var(--c); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.swatch[aria-pressed="true"] i { box-shadow: 0 0 0 3px var(--accent); }
+.sep { width: 1px; height: 26px; background: var(--line); margin: 0 4px; }
+.title-chip { pointer-events: auto; font: 800 16px var(--font-sheet); padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.14); }
+
+.scroller { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 76px 0 40px; display: flex; }
+.stage { margin: 0 auto; position: relative; flex: none; }
+.paper-wrap { position: relative; box-shadow: 0 6px 28px rgba(0,0,0,.28); background: var(--paper); }
+.paper-wrap .sheet { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#ink { position: absolute; left: 0; top: 0; touch-action: pan-x pan-y pinch-zoom; }
+#ink.finger { touch-action: none; }
+
+/* ---------- worksheet (always white paper, A4 landscape at 96 dpi, modeled on the Super Teacher "Basic Multiplication" sheet) ---------- */
+.sheet { width: 1123px; height: 794px; background: #fff; color: #000; box-sizing: border-box; padding: 30px 44px 0; font-family: var(--font-num); position: relative; }
+.sheet .namebar { border: 1.5px solid #000; height: 28px; box-sizing: border-box; display: flex; align-items: flex-end; padding: 0 2px 2px; font-size: 17px; line-height: 1; }
+.sheet .namebar span { flex: none; width: 520px; border-bottom: 1.5px solid #000; height: 1px; margin-left: 4px; }
+.sheet .frame { position: absolute; left: 30px; right: 40px; top: 84px; bottom: 36px; border: 2.5px solid #9a9a9a; border-top-width: 3px; border-radius: 3px; }
+.sheet .pill { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); width: 440px; height: 58px; box-sizing: border-box; background: #fff; border: 2px solid #777; border-radius: 30px 30px 30px 30px / 24px; display: grid; place-items: center; font: 600 31px var(--font-title); letter-spacing: .01em; }
+.sheet .grid { position: absolute; left: 62px; right: 66px; top: 154px; height: 500px; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(5, 1fr); }
+.prob { justify-self: center; width: 76px; align-self: start; font-size: 31px; line-height: 1; font-variant-numeric: tabular-nums; }
+.prob .top { text-align: right; padding-right: 8px; }
+.prob .bot { display: flex; justify-content: space-between; border-bottom: 2.5px solid #000; padding: 1px 8px 0 12px; }
+.sheet .score { position: absolute; left: 0; right: 0; top: 664px; text-align: center; font-size: 25px; line-height: 1.1; }
+.sheet .score b { font: 600 25px var(--font-title); }
+.sheet .score .u { display: inline-block; width: 124px; border-bottom: 1.5px solid #000; margin: 0 6px; }
+.sheet .credit { position: absolute; left: 0; right: 0; top: 706px; text-align: center; font-size: 15px; line-height: 1.25; }
+</style>
+
+</head>
+<body>
+<div class="app" id="app">
+  <nav class="nav" aria-label="Worksheets">
+    <div class="nav-head">
+      <h1>Times Tables</h1>
+      <button class="btn" id="hideNav" aria-label="Hide sheet list" title="Hide sheet list">
+        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/><path d="M5 5v14"/></svg>
+      </button>
+    </div>
+    <div class="nav-list" id="navList"></div>
+  </nav>
+
+  <main class="main">
+    <div class="toolbar" id="toolbar">
+      <div class="group" id="navGroup" hidden>
+        <button class="btn" id="showNav" aria-label="Show sheet list" title="Show sheet list">
+          <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/><path d="M19 5v14"/></svg>
+        </button>
+      </div>
+      <div class="title-chip" id="titleChip">× 1</div>
+      <div class="group" role="group" aria-label="Drawing tools">
+        <button class="btn" id="toolPen" aria-pressed="true" aria-label="Pen">
+          <svg viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg>Pen
+        </button>
+        <button class="btn" id="toolEraser" aria-pressed="false" aria-label="Eraser">
+          <svg viewBox="0 0 24 24"><path d="M20 20H9L4 15a2 2 0 010-3l8-8a2 2 0 013 0l5 5a2 2 0 010 3l-7 8"/><path d="M7 11l6 6"/></svg>Erase
+        </button>
+        <span class="sep"></span>
+        <button class="swatch" data-color="#1a1a1a" style="--c:#1a1a1a" aria-label="Black ink" aria-pressed="true"><i></i></button>
+        <button class="swatch" data-color="#1d4ed8" style="--c:#1d4ed8" aria-label="Blue ink" aria-pressed="false"><i></i></button>
+        <button class="swatch" data-color="#dc2626" style="--c:#dc2626" aria-label="Red ink" aria-pressed="false"><i></i></button>
+        <button class="swatch" data-color="#15803d" style="--c:#15803d" aria-label="Green ink" aria-pressed="false"><i></i></button>
+      </div>
+      <div class="group" role="group" aria-label="Edit">
+        <button class="btn" id="undo" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>Undo</button>
+        <button class="btn warn" id="clear" aria-label="Clear this sheet"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span id="clearLabel">Clear</span></button>
+      </div>
+      <div class="group" role="group" aria-label="View">
+        <button class="btn" id="fit" aria-label="Toggle fit page or fit width"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span id="fitLabel">Fit width</span></button>
+        <button class="btn" id="finger" aria-pressed="false" aria-label="Allow finger drawing">Finger draws</button>
+      </div>
+    </div>
+
+    <div class="scroller" id="scroller">
+      <div class="stage" id="stage">
+        <div class="paper-wrap" id="paperWrap">
+          <div id="sheetHost"></div>
+          <canvas id="ink"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  var COUNT = 10, W = 1123, H = 794;
+  var $ = function (id) { return document.getElementById(id); };
+  var app = $('app'), navList = $('navList'), sheetHost = $('sheetHost'), canvas = $('ink'),
+      ctx = canvas.getContext('2d'), scroller = $('scroller'), paperWrap = $('paperWrap'), stage = $('stage');
+
+  /* ---------- storage (per-viewer convenience, tolerate failure) ---------- */
+  function load(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+  /* ---------- worksheet generation ---------- */
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function shuffle(a, r) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function problems(n) {
+    var r = rng(n * 977 + 13), out = [];
+    while (out.length < 50) {
+      var base = []; for (var i = 0; i <= 10; i++) base.push(i);
+      out = out.concat(shuffle(base, r));
+    }
+    return out.slice(0, 50);
+  }
+  function sheetHTML(n) {
+    var ps = problems(n).map(function (a) {
+      return '<div class="prob"><div class="top">' + a + '</div><div class="bot"><span>x</span><span>' + n + '</span></div></div>';
+    }).join('');
+    return '<div class="sheet"><div class="namebar">Name: <span></span></div>' +
+      '<div class="frame"></div><div class="pill">Basic Multiplication</div>' +
+      '<div class="grid">' + ps + '</div>' +
+      '<div class="score"><b>Time:</b><span class="u"></span> minutes &nbsp;&nbsp; <b>Score:</b><span class="u"></span> out of 50</div>' +
+      '<div class="credit">Times table: ' + n + '</div></div>';
+  }
+
+  /* ---------- navigator ---------- */
+  var state = load('tt-state', { sheet: 1, color: '#1a1a1a', finger: false, fit: 'width', navHidden: false });
+  var ink = load('tt-ink', {});            // { "3": [stroke, ...] }
+  var strokes = [];
+  var current = 1;
+
+  function buildNav() {
+    var html = '';
+    for (var n = 1; n <= COUNT; n++) {
+      html += '<button class="nav-item" data-n="' + n + '" aria-current="false">' +
+        '<div class="thumb">' + sheetHTML(n) + '</div>' +
+        '<div class="nav-label"><b>× ' + n + '</b><span id="st' + n + '">Not started</span></div></button>';
+    }
+    navList.innerHTML = html;
+    navList.addEventListener('click', function (e) {
+      var b = e.target.closest('.nav-item'); if (b) go(+b.dataset.n);
+    });
+  }
+  function refreshStatus() {
+    for (var n = 1; n <= COUNT; n++) {
+      var s = $('st' + n), has = ink[n] && ink[n].length;
+      s.textContent = has ? 'In progress' : 'Not started';
+      s.className = has ? 'inked' : '';
+    }
+  }
+
+  /* ---------- sheet display and scaling ---------- */
+  var scale = 1, dpr = 1;
+  function layout() {
+    var availW = scroller.clientWidth - 24, availH = scroller.clientHeight - 76 - 24;
+    var s = state.fit === 'page' ? Math.min(availW / W, availH / H) : availW / W;
+    scale = Math.max(.3, Math.min(s, 2));
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    var pw = Math.round(W * scale), ph = Math.round(H * scale);
+    paperWrap.style.width = pw + 'px'; paperWrap.style.height = ph + 'px';
+    var sh = sheetHost.firstChild; if (sh) sh.style.transform = 'scale(' + (pw / W) + ')';
+    canvas.style.width = pw + 'px'; canvas.style.height = ph + 'px';
+    canvas.width = Math.round(pw * dpr); canvas.height = Math.round(ph * dpr);
+    redraw();
+    $('fitLabel').textContent = state.fit === 'page' ? 'Fit page' : 'Fit width';
+  }
+  function go(n) {
+    current = n; state.sheet = n; save('tt-state', state);
+    sheetHost.innerHTML = sheetHTML(n);
+    strokes = ink[n] || (ink[n] = []);
+    $('titleChip').textContent = '× ' + n;
+    Array.prototype.forEach.call(navList.children, function (el) { el.setAttribute('aria-current', String(+el.dataset.n === n)); });
+    try { history.replaceState(null, '', '#times-' + n); } catch (e) {}
+    layout(); scroller.scrollTop = 0; updateUndo();
+  }
+
+  /* ---------- drawing ---------- */
+  var tool = 'pen', drawing = null, lastPt = null;
+  function width(st, p) {
+    var base = st.tool === 'eraser' ? 26 : 2.6;
+    return st.tool === 'eraser' ? base : base * (.55 + p * 1.1);
+  }
+  function seg(st, a, b) {
+    ctx.save();
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.globalCompositeOperation = st.tool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = st.color; ctx.fillStyle = st.color;
+    ctx.lineWidth = width(st, (a[2] + b[2]) / 2);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    ctx.restore();
+  }
+  function dot(st, p) {
+    ctx.save();
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    ctx.globalCompositeOperation = st.tool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.fillStyle = st.color; ctx.beginPath(); ctx.arc(p[0], p[1], width(st, p[2]) / 2, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  }
+  function redraw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    strokes.forEach(function (st) {
+      if (st.pts.length === 1) dot(st, st.pts[0]);
+      for (var i = 1; i < st.pts.length; i++) seg(st, st.pts[i - 1], st.pts[i]);
+    });
+  }
+  function toSheet(e) {
+    var r = canvas.getBoundingClientRect();
+    var p = e.pointerType === 'pen' ? (e.pressure || .5) : (e.pressure && e.pressure !== .5 ? e.pressure : .5);
+    return [(e.clientX - r.left) / scale, (e.clientY - r.top) / scale, p];
+  }
+  function allowed(e) { return e.pointerType !== 'touch' || state.finger; }
+
+  canvas.addEventListener('pointerdown', function (e) {
+    if (!allowed(e) || e.button > 0) return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
+    // Apple Pencil double-tap / barrel eraser button support
+    var useEraser = tool === 'eraser' || (e.buttons & 32);
+    drawing = { tool: useEraser ? 'eraser' : 'pen', color: state.color, pts: [toSheet(e)], id: e.pointerId };
+    strokes.push(drawing); dot(drawing, drawing.pts[0]);
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (!drawing || e.pointerId !== drawing.id) return;
+    e.preventDefault();
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (!evs.length) evs = [e];
+    evs.forEach(function (ev) {
+      var p = toSheet(ev), prev = drawing.pts[drawing.pts.length - 1];
+      if (Math.abs(p[0] - prev[0]) + Math.abs(p[1] - prev[1]) < .3) return;
+      drawing.pts.push(p); seg(drawing, prev, p);
+    });
+  });
+  function end(e) {
+    if (!drawing || (e && e.pointerId !== drawing.id)) return;
+    drawing = null; save('tt-ink', ink); refreshStatus(); updateUndo();
+  }
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  // Stop Safari from scrolling or selecting while the Pencil is down
+  canvas.addEventListener('touchstart', function (e) {
+    var t = e.touches[0];
+    if (t && (t.touchType === 'stylus' || state.finger)) e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  /* ---------- toolbar ---------- */
+  function setTool(t) {
+    tool = t;
+    $('toolPen').setAttribute('aria-pressed', String(t === 'pen'));
+    $('toolEraser').setAttribute('aria-pressed', String(t === 'eraser'));
+  }
+  $('toolPen').onclick = function () { setTool('pen'); };
+  $('toolEraser').onclick = function () { setTool('eraser'); };
+  Array.prototype.forEach.call(document.querySelectorAll('.swatch'), function (b) {
+    b.onclick = function () {
+      state.color = b.dataset.color; save('tt-state', state); setTool('pen'); syncSwatches();
+    };
+  });
+  function syncSwatches() {
+    Array.prototype.forEach.call(document.querySelectorAll('.swatch'), function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.color === state.color));
+    });
+  }
+  function updateUndo() { $('undo').disabled = !strokes.length; }
+  $('undo').onclick = function () { strokes.pop(); redraw(); save('tt-ink', ink); refreshStatus(); updateUndo(); };
+
+  var armTimer = null;
+  $('clear').onclick = function () {
+    var b = $('clear');
+    if (b.dataset.armed === 'true') {
+      clearTimeout(armTimer); b.dataset.armed = 'false'; $('clearLabel').textContent = 'Clear';
+      strokes.length = 0; redraw(); save('tt-ink', ink); refreshStatus(); updateUndo();
+    } else {
+      b.dataset.armed = 'true'; $('clearLabel').textContent = 'Tap to confirm';
+      armTimer = setTimeout(function () { b.dataset.armed = 'false'; $('clearLabel').textContent = 'Clear'; }, 3000);
+    }
+  };
+  $('fit').onclick = function () { state.fit = state.fit === 'page' ? 'width' : 'page'; save('tt-state', state); layout(); };
+  $('finger').onclick = function () {
+    state.finger = !state.finger; save('tt-state', state);
+    $('finger').setAttribute('aria-pressed', String(state.finger));
+    canvas.className = state.finger ? 'finger' : '';
+  };
+
+  function setNav(hidden) {
+    state.navHidden = hidden; save('tt-state', state);
+    app.classList.toggle('nav-hidden', hidden);
+    $('navGroup').hidden = !hidden;
+    setTimeout(layout, 280);
+  }
+  $('hideNav').onclick = function () { setNav(true); };
+  $('showNav').onclick = function () { setNav(false); };
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', function () { setTimeout(layout, 250); });
+  window.addEventListener('hashchange', function () {
+    var m = /^#times-(\d+)$/.exec(location.hash); if (m && +m[1] >= 1 && +m[1] <= COUNT) go(+m[1]);
+  });
+
+  /* ---------- boot ---------- */
+  buildNav(); refreshStatus(); syncSwatches();
+  $('finger').setAttribute('aria-pressed', String(state.finger));
+  canvas.className = state.finger ? 'finger' : '';
+  var m = /^#times-(\d+)$/.exec(location.hash);
+  var start = m ? +m[1] : state.sheet;
+  if (!(start >= 1 && start <= COUNT)) start = 1;
+  setNav(!!state.navHidden);
+  go(start);
+})();
+</script>
+
+</body>
+</html>
