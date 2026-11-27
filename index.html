@@ -100,18 +100,29 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 
 /* ---------- worksheet (always white paper, A4 landscape at 96 dpi, modeled on the Super Teacher "Basic Multiplication" sheet) ---------- */
 .sheet { width: 1123px; height: 794px; background: #fff; color: #000; box-sizing: border-box; padding: 30px 44px 0; font-family: var(--font-num); position: relative; }
-.sheet .namebar { border: 1.5px solid #000; height: 28px; box-sizing: border-box; display: flex; align-items: flex-end; padding: 0 2px 2px; font-size: 17px; line-height: 1; }
-.sheet .namebar span { flex: none; width: 520px; border-bottom: 1.5px solid #000; height: 1px; margin-left: 4px; }
-.sheet .frame { position: absolute; left: 30px; right: 40px; top: 84px; bottom: 36px; border: 2.5px solid #9a9a9a; border-top-width: 3px; border-radius: 3px; }
-.sheet .pill { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); width: 440px; height: 58px; box-sizing: border-box; background: #fff; border: 2px solid #777; border-radius: 30px 30px 30px 30px / 24px; display: grid; place-items: center; font: 600 31px var(--font-title); letter-spacing: .01em; }
-.sheet .grid { position: absolute; left: 62px; right: 66px; top: 154px; height: 500px; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(5, 1fr); }
-.prob { justify-self: center; width: 76px; align-self: start; font-size: 31px; line-height: 1; font-variant-numeric: tabular-nums; }
+.prob .ans { text-align: right; padding-right: 8px; margin-top: 10px; color: #c0182b; font: 600 34px var(--font-title); line-height: 1; }
+.app.parent #ink { pointer-events: none; }
+.app.parent .lock-off { opacity: .35; pointer-events: none; }
+.modal { position: fixed; inset: 0; z-index: 20; background: rgba(10,14,22,.55); display: grid; place-items: center; padding: 16px; }
+.pin { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 22px 18px; width: min(320px, 100%); box-shadow: 0 10px 40px rgba(0,0,0,.4); text-align: center; }
+.pin h2 { margin: 0 0 4px; font: 800 20px var(--font-sheet); }
+.pin p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+.dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 18px; height: 18px; }
+.dots i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box; }
+.dots i.on { background: var(--fg); border-color: var(--fg); }
+.pin.bad .dots { animation: shake .35s; }
+.pin.bad .dots i { border-color: #c2410c; background: #c2410c; }
+@keyframes shake { 20% { transform: translateX(-9px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+.keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.keys button { height: 58px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); font: 600 24px var(--font-ui); }
+.keys button:active { background: var(--accent); color: var(--accent-fg); }
+.keys .alt { font-size: 14px; background: transparent; border-color: transparent; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .pin.bad .dots { animation: none; } }
+.sheet .frame { position: absolute; left: 30px; right: 30px; top: 30px; bottom: 30px; border: 2.5px solid #9a9a9a; border-radius: 3px; }
+.sheet .grid { position: absolute; left: 56px; right: 56px; top: 62px; bottom: 56px; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(5, 1fr); }
+.prob { justify-self: center; width: 80px; align-self: start; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
 .prob .top { text-align: right; padding-right: 8px; }
 .prob .bot { display: flex; justify-content: space-between; border-bottom: 2.5px solid #000; padding: 1px 8px 0 12px; }
-.sheet .score { position: absolute; left: 0; right: 0; top: 664px; text-align: center; font-size: 25px; line-height: 1.1; }
-.sheet .score b { font: 600 25px var(--font-title); }
-.sheet .score .u { display: inline-block; width: 124px; border-bottom: 1.5px solid #000; margin: 0 6px; }
-.sheet .credit { position: absolute; left: 0; right: 0; top: 706px; text-align: center; font-size: 15px; line-height: 1.25; }
 </style>
 
 </head>
@@ -134,6 +145,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
           <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/><path d="M19 5v14"/></svg>
         </button>
       </div>
+      <div class="group" role="group" aria-label="Parent">
+        <button class="btn" id="answers" aria-pressed="false" aria-label="Parent answers"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg><span id="answersLabel">Answers</span></button>
+      </div>
       <div class="title-chip" id="titleChip">× 1</div>
       <div class="group" role="group" aria-label="Drawing tools">
         <button class="btn" id="toolPen" aria-pressed="true" aria-label="Pen">
@@ -148,6 +162,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
         <button class="swatch" data-color="#dc2626" style="--c:#dc2626" aria-label="Red ink" aria-pressed="false"><i></i></button>
         <button class="swatch" data-color="#15803d" style="--c:#15803d" aria-label="Green ink" aria-pressed="false"><i></i></button>
       </div>
+      <div class="group lock-off-g" role="group" aria-label="Mix">
+        <button class="btn warn" id="shuffle" aria-label="Mix up the questions"><svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg><span id="shuffleLabel">Mix questions</span></button>
+      </div>
       <div class="group" role="group" aria-label="Edit">
         <button class="btn" id="undo" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>Undo</button>
         <button class="btn warn" id="clear" aria-label="Clear this sheet"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span id="clearLabel">Clear</span></button>
@@ -155,6 +172,20 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
       <div class="group" role="group" aria-label="View">
         <button class="btn" id="fit" aria-label="Toggle fit page or fit width"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span id="fitLabel">Fit width</span></button>
         <button class="btn" id="finger" aria-pressed="false" aria-label="Allow finger drawing">Finger draws</button>
+      </div>
+    </div>
+
+    <div class="modal" id="pinModal" hidden>
+      <div class="pin" id="pinBox" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+        <h2 id="pinTitle">Parent code</h2>
+        <p id="pinMsg">Enter the 4-digit code to see the answers.</p>
+        <div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+        <div class="keys" id="keys">
+          <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+          <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+          <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+          <button class="alt" data-k="cancel">Cancel</button><button data-k="0">0</button><button class="alt" data-k="back" aria-label="Delete">Delete</button>
+        </div>
       </div>
     </div>
 
@@ -184,26 +215,24 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function shuffle(a, r) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function problems(n) {
-    var r = rng(n * 977 + 13), out = [];
+    var r = rng((state.seeds && state.seeds[n]) || n * 977 + 13), out = [];
     while (out.length < 50) {
       var base = []; for (var i = 0; i <= 10; i++) base.push(i);
       out = out.concat(shuffle(base, r));
     }
     return out.slice(0, 50);
   }
-  function sheetHTML(n) {
+  var parentMode = false;
+  function sheetHTML(n, showAns) {
     var ps = problems(n).map(function (a) {
-      return '<div class="prob"><div class="top">' + a + '</div><div class="bot"><span>x</span><span>' + n + '</span></div></div>';
+      return '<div class="prob"><div class="top">' + a + '</div><div class="bot"><span>x</span><span>' + n + '</span></div>' + (showAns ? '<div class="ans">' + (a * n) + '</div>' : '') + '</div>';
     }).join('');
-    return '<div class="sheet"><div class="namebar">Name: <span></span></div>' +
-      '<div class="frame"></div><div class="pill">Basic Multiplication</div>' +
-      '<div class="grid">' + ps + '</div>' +
-      '<div class="score"><b>Time:</b><span class="u"></span> minutes &nbsp;&nbsp; <b>Score:</b><span class="u"></span> out of 50</div>' +
-      '<div class="credit">Times table: ' + n + '</div></div>';
+    return '<div class="sheet"><div class="frame"></div><div class="grid">' + ps + '</div></div>';
   }
 
   /* ---------- navigator ---------- */
-  var state = load('tt-state', { sheet: 1, color: '#1a1a1a', finger: false, fit: 'width', navHidden: false });
+  var state = load('tt-state', { sheet: 1, color: '#1a1a1a', finger: false, fit: 'width', navHidden: false, seeds: {} });
+  if (!state.seeds) state.seeds = {};
   var ink = load('tt-ink', {});            // { "3": [stroke, ...] }
   var strokes = [];
   var current = 1;
@@ -245,7 +274,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   }
   function go(n) {
     current = n; state.sheet = n; save('tt-state', state);
-    sheetHost.innerHTML = sheetHTML(n);
+    sheetHost.innerHTML = sheetHTML(n, parentMode);
     strokes = ink[n] || (ink[n] = []);
     $('titleChip').textContent = '× ' + n;
     Array.prototype.forEach.call(navList.children, function (el) { el.setAttribute('aria-current', String(+el.dataset.n === n)); });
@@ -341,7 +370,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
       b.setAttribute('aria-pressed', String(b.dataset.color === state.color));
     });
   }
-  function updateUndo() { $('undo').disabled = !strokes.length; }
+  function updateUndo() { $('undo').disabled = parentMode || !strokes.length; }
   $('undo').onclick = function () { strokes.pop(); redraw(); save('tt-ink', ink); refreshStatus(); updateUndo(); };
 
   var armTimer = null;
@@ -355,6 +384,58 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
       armTimer = setTimeout(function () { b.dataset.armed = 'false'; $('clearLabel').textContent = 'Clear'; }, 3000);
     }
   };
+  var shufTimer = null;
+  $('shuffle').onclick = function () {
+    var b = $('shuffle');
+    if (strokes.length && b.dataset.armed !== 'true') {
+      b.dataset.armed = 'true'; $('shuffleLabel').textContent = 'Erases your writing. Tap again';
+      shufTimer = setTimeout(function () { b.dataset.armed = 'false'; $('shuffleLabel').textContent = 'Mix questions'; }, 3500);
+      return;
+    }
+    clearTimeout(shufTimer); b.dataset.armed = 'false'; $('shuffleLabel').textContent = 'Mix questions';
+    state.seeds[current] = Math.floor(Math.random() * 1e9) + 1; save('tt-state', state);
+    ink[current] = []; save('tt-ink', ink);
+    navList.children[current - 1].querySelector('.thumb').innerHTML = sheetHTML(current);
+    go(current); refreshStatus();
+  };
+  /* ---------- parent answers (code 0330) ---------- */
+  var PIN = '0330', entered = '', pinModal = $('pinModal'), pinBox = $('pinBox');
+  function drawDots() { Array.prototype.forEach.call($('dots').children, function (d, i) { d.className = i < entered.length ? 'on' : ''; }); }
+  function openPin() { entered = ''; drawDots(); pinBox.classList.remove('bad'); $('pinMsg').textContent = 'Enter the 4-digit code to see the answers.'; pinModal.hidden = false; $('keys').querySelector('[data-k="5"]').focus(); }
+  function closePin() { pinModal.hidden = true; entered = ''; $('answers').focus(); }
+  function setParent(on) {
+    parentMode = on;
+    app.classList.toggle('parent', on);
+    $('answers').setAttribute('aria-pressed', String(on));
+    $('answersLabel').textContent = on ? 'Exit answers' : 'Answers';
+    ['shuffle', 'undo', 'clear', 'toolPen', 'toolEraser'].forEach(function (id) { $(id).disabled = on || (id === 'undo' && !strokes.length); });
+    sheetHost.innerHTML = sheetHTML(current, on);   // answers exist in the page only while unlocked
+    layout();
+  }
+  function pinKey(k) {
+    if (k === 'cancel') return closePin();
+    if (k === 'back') entered = entered.slice(0, -1);
+    else if (entered.length < 4) entered += k;
+    drawDots();
+    if (entered.length === 4) {
+      if (entered === PIN) { closePin(); setParent(true); }
+      else {
+        pinBox.classList.remove('bad'); void pinBox.offsetWidth; pinBox.classList.add('bad');
+        $('pinMsg').textContent = 'Wrong code. Try again.';
+        setTimeout(function () { entered = ''; drawDots(); pinBox.classList.remove('bad'); }, 700);
+      }
+    }
+  }
+  $('answers').onclick = function () { if (parentMode) setParent(false); else openPin(); };
+  $('keys').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) pinKey(b.dataset.k); });
+  document.addEventListener('keydown', function (e) {
+    if (pinModal.hidden) return;
+    if (/^[0-9]$/.test(e.key)) pinKey(e.key);
+    else if (e.key === 'Backspace') pinKey('back');
+    else if (e.key === 'Escape') pinKey('cancel');
+  });
+  pinModal.addEventListener('click', function (e) { if (e.target === pinModal) closePin(); });
+
   $('fit').onclick = function () { state.fit = state.fit === 'page' ? 'width' : 'page'; save('tt-state', state); layout(); };
   $('finger').onclick = function () {
     state.finger = !state.finger; save('tt-state', state);
