@@ -165,11 +165,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
         <button class="btn" id="toolEraser" aria-pressed="false" aria-label="Eraser">
           <svg viewBox="0 0 24 24"><path d="M20 20H9L4 15a2 2 0 010-3l8-8a2 2 0 013 0l5 5a2 2 0 010 3l-7 8"/><path d="M7 11l6 6"/></svg>Erase
         </button>
-        <span class="sep"></span>
-        <button class="swatch" data-color="#1a1a1a" style="--c:#1a1a1a" aria-label="Black ink" aria-pressed="true"><i></i></button>
-        <button class="swatch" data-color="#1d4ed8" style="--c:#1d4ed8" aria-label="Blue ink" aria-pressed="false"><i></i></button>
-        <button class="swatch" data-color="#dc2626" style="--c:#dc2626" aria-label="Red ink" aria-pressed="false"><i></i></button>
-        <button class="swatch" data-color="#15803d" style="--c:#15803d" aria-label="Green ink" aria-pressed="false"><i></i></button>
       </div>
       <div class="group lock-off-g" role="group" aria-label="Mix">
         <button class="btn warn" id="shuffle" aria-label="Mix up the questions"><svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg><span id="shuffleLabel">Mix questions</span></button>
@@ -394,6 +389,7 @@ if (typeof module !== 'undefined') module.exports = DigitRec;
   var ink = load('tt-ink', {});            // { "3": [stroke, ...] }
   var strokes = [];
   var current = 1;
+  state.color = '#1a1a1a';   // single black ink
 
   function buildNav() {
     var html = '';
