@@ -101,7 +101,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 
 /* ---------- worksheet (always white paper, A4 landscape at 96 dpi, modeled on the Super Teacher "Basic Multiplication" sheet) ---------- */
 .sheet { width: 1123px; height: 794px; background: #fff; color: #000; box-sizing: border-box; padding: 30px 44px 0; font-family: var(--font-num); position: relative; }
-.prob .ans { text-align: right; padding-right: 8px; margin-top: 10px; color: #c0182b; font: 600 34px var(--font-title); line-height: 1; }
+.prob .ans { text-align: right; padding-right: 8px; margin-top: 10px; color: rgba(110, 118, 132, .38); font: 600 34px var(--font-title); line-height: 1; }
+.prob { position: relative; }
+.mark { position: absolute; left: -16px; top: 0; width: 26px; height: 26px; border-radius: 50%; color: #fff; font: 700 17px/26px var(--font-ui); text-align: center; pointer-events: none; }
+.mark.ok { background: #15803d; } .mark.bad { background: #c0182b; } .mark.blank { background: #7b8494; } .mark.unk { background: #b45309; }
+.chk { padding: 0 12px 0 6px; font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; max-width: 340px; }
 .app.parent #ink { pointer-events: none; }
 .app.parent .lock-off { opacity: .35; pointer-events: none; }
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(10,14,22,.55); display: grid; place-items: center; padding: 16px; }
@@ -148,6 +152,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
       </div>
       <div class="group" role="group" aria-label="Parent">
         <button class="btn" id="answers" aria-pressed="false" aria-label="Parent answers"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg><span id="answersLabel">Answers</span></button>
+      </div>
+      <div class="group" id="checkGroup" role="group" aria-label="Check work" hidden>
+        <button class="btn" id="check" aria-label="Check the handwritten answers"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg><span id="checkLabel">Check work</span></button>
+        <span class="chk" id="checkMsg" role="status" aria-live="polite"></span>
       </div>
       <div class="title-chip" id="titleChip">× 1</div>
       <div class="group" role="group" aria-label="Drawing tools">
@@ -411,6 +419,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
     $('answersLabel').textContent = on ? 'Exit answers' : 'Answers';
     ['shuffle', 'undo', 'clear', 'toolPen', 'toolEraser'].forEach(function (id) { $(id).disabled = on || (id === 'undo' && !strokes.length); });
     sheetHost.innerHTML = sheetHTML(current, on);   // answers exist in the page only while unlocked
+    $('checkGroup').hidden = !(on && sampleFn);
+    $('checkMsg').textContent = '';
     layout();
   }
   function pinKey(k) {
@@ -436,6 +446,57 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
     else if (e.key === 'Escape') pinKey('cancel');
   });
   pinModal.addEventListener('click', function (e) { if (e.target === pinModal) closePin(); });
+
+  /* ---------- check handwriting (needs Claude via the artifact runtime) ---------- */
+  var sampleFn = null, checking = false;
+  if (window.claude && window.claude.use) {
+    window.claude.use('sample').then(function (f) { sampleFn = f || null; if (parentMode) $('checkGroup').hidden = !sampleFn; }, function () {});
+  }
+  var COLS = 10, ROWS = 5, GL = 56, GT = 62, GW = W - 112, GH = H - 118;
+  function sheetImage() {
+    var k = 1.1, c = document.createElement('canvas');
+    c.width = Math.round(W * k); c.height = Math.round(H * k);
+    var g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(canvas, 0, 0, c.width, c.height);
+    g.strokeStyle = '#c9ced8'; g.lineWidth = 1; g.fillStyle = '#8a93a3'; g.font = '13px sans-serif';
+    var cw = GW / COLS, ch = GH / ROWS;
+    for (var r = 0; r < ROWS; r++) for (var q = 0; q < COLS; q++) {
+      var x = (GL + q * cw) * k, y = (GT + r * ch) * k;
+      g.strokeRect(x, y, cw * k, ch * k);
+      g.fillText(String(r * COLS + q + 1), x + 3, y + 13);
+    }
+    return new Promise(function (res) { c.toBlob(res, 'image/png'); });
+  }
+  function checkErr(e) {
+    var m = { not_granted: 'Claude access was declined for this page.', rate_limited: 'Too many checks. Wait a bit and try again.', images_unavailable: 'Reading handwriting is not available here.', session_expired: 'Sign in to Claude again, then retry.', image_rejected: 'The sheet image could not be read.' };
+    return m[e && e.code] || 'Could not check the work. Try again.';
+  }
+  $('check').onclick = function () {
+    if (checking || !sampleFn) return;
+    if (!strokes.some(function (st) { return st.tool === 'pen'; })) { $('checkMsg').textContent = 'No writing on this sheet yet.'; return; }
+    checking = true; $('check').disabled = true; $('checkLabel').textContent = 'Checking…'; $('checkMsg').textContent = '';
+    var n = current, probs = problems(n);
+    sheetImage().then(function (blob) {
+      var prompt = 'This image is a child\'s multiplication worksheet, drawn as a grid of 10 columns by 5 rows. The 50 cells are numbered 1 to 50 (left to right, top to bottom) with a small gray number in the top-left corner of each cell. The printed problems are not shown. In each cell the child may have handwritten a whole-number answer with digits. Transcribe exactly the digits written in each cell. Do not calculate, correct or guess missing digits. Use "" for a cell with no writing and "?" if the writing cannot be read. Reply with only a JSON array of exactly 50 objects like [{"cell":1,"answer":"12"}, {"cell":2,"answer":""}].';
+      return sampleFn.json(prompt, { images: [blob], modelTier: 'default' });
+    }).then(function (arr) {
+      if (current !== n || !parentMode) return;
+      var by = {}; (arr || []).forEach(function (o) { if (o && o.cell) by[o.cell] = String(o.answer == null ? '' : o.answer); });
+      var right = 0, tried = 0, boxes = sheetHost.querySelectorAll('.prob');
+      Array.prototype.forEach.call(boxes, function (box, i) {
+        var old = box.querySelector('.mark'); if (old) old.remove();
+        var raw = (by[i + 1] || '').trim(), digits = raw.replace(/[^0-9]/g, ''), cls, txt;
+        if (raw === '' ) { cls = 'blank'; txt = '–'; }
+        else if (digits === '' ) { cls = 'unk'; txt = '?'; }
+        else { tried++; if (digits === String(probs[i] * n)) { cls = 'ok'; txt = '✓'; right++; } else { cls = 'bad'; txt = '✗'; } }
+        var m = document.createElement('span'); m.className = 'mark ' + cls; m.textContent = txt; m.setAttribute('aria-label', cls === 'ok' ? 'Correct' : cls === 'bad' ? 'Wrong' : cls === 'blank' ? 'Not answered' : 'Unreadable');
+        box.appendChild(m);
+      });
+      $('checkMsg').textContent = right + ' of 50 correct' + (tried < 50 ? ' · ' + (50 - tried) + ' blank or unreadable' : '');
+    }).catch(function (e) { $('checkMsg').textContent = checkErr(e); })
+      .then(function () { checking = false; $('check').disabled = false; $('checkLabel').textContent = 'Check work'; });
+  };
 
   $('fit').onclick = function () { state.fit = state.fit === 'page' ? 'width' : 'page'; save('tt-state', state); layout(); };
   $('finger').onclick = function () {
