@@ -381,6 +381,7 @@ if (typeof module !== 'undefined') module.exports = DigitRec;
   }
   var parentMode = false;
   function sheetHTML(n, showAns) {
+    if (n === 0) return '<div class="sheet"></div>';
     var ps = problems(n).map(function (a) {
       return '<div class="prob"><div class="top">' + a + '</div><div class="bot"><span>x</span><span>' + n + '</span></div>' + (showAns ? '<div class="ans">' + (a * n) + '</div>' : '') + '</div>';
     }).join('');
@@ -396,10 +397,10 @@ if (typeof module !== 'undefined') module.exports = DigitRec;
 
   function buildNav() {
     var html = '';
-    for (var n = 1; n <= COUNT; n++) {
+    for (var n = 0; n <= COUNT; n++) {
       html += '<button class="nav-item" data-n="' + n + '" aria-current="false">' +
         '<div class="thumb">' + sheetHTML(n) + '</div>' +
-        '<div class="nav-label"><b>× ' + n + '</b><span id="st' + n + '">Not started</span></div></button>';
+        '<div class="nav-label"><b>' + (n === 0 ? 'Blank' : '× ' + n) + '</b><span id="st' + n + '">' + (n === 0 ? 'Free writing' : 'Not started') + '</span></div></button>';
     }
     navList.innerHTML = html;
     navList.addEventListener('click', function (e) {
@@ -407,9 +408,9 @@ if (typeof module !== 'undefined') module.exports = DigitRec;
     });
   }
   function refreshStatus() {
-    for (var n = 1; n <= COUNT; n++) {
+    for (var n = 0; n <= COUNT; n++) {
       var s = $('st' + n), has = ink[n] && ink[n].length;
-      s.textContent = has ? 'In progress' : 'Not started';
+      s.textContent = has ? (n === 0 ? 'Has writing' : 'In progress') : (n === 0 ? 'Free writing' : 'Not started');
       s.className = has ? 'inked' : '';
     }
   }
@@ -433,10 +434,12 @@ if (typeof module !== 'undefined') module.exports = DigitRec;
     current = n; state.sheet = n; save('tt-state', state);
     sheetHost.innerHTML = sheetHTML(n, parentMode);
     strokes = ink[n] || (ink[n] = []);
-    $('titleChip').textContent = '× ' + n;
+    $('titleChip').textContent = n === 0 ? 'Blank' : '× ' + n;
     Array.prototype.forEach.call(navList.children, function (el) { el.setAttribute('aria-current', String(+el.dataset.n === n)); });
-    try { history.replaceState(null, '', '#times-' + n); } catch (e) {}
+    try { history.replaceState(null, '', n === 0 ? '#blank' : '#times-' + n); } catch (e) {}
     layout(); scroller.scrollTop = 0; updateUndo();
+    if (n === 0 && parentMode) setParent(false);          // no answers on the blank sheet
+    $('shuffle').disabled = n === 0; $('answers').disabled = n === 0;
   }
 
   /* ---------- drawing ---------- */
@@ -552,7 +555,7 @@ if (typeof module !== 'undefined') module.exports = DigitRec;
     clearTimeout(shufTimer); b.dataset.armed = 'false'; $('shuffleLabel').textContent = 'Mix questions';
     state.seeds[current] = Math.floor(Math.random() * 1e9) + 1; save('tt-state', state);
     ink[current] = []; save('tt-ink', ink);
-    navList.children[current - 1].querySelector('.thumb').innerHTML = sheetHTML(current);
+    navList.children[current].querySelector('.thumb').innerHTML = sheetHTML(current);
     go(current); refreshStatus();
   };
   /* ---------- parent answers (code 0330) ---------- */
@@ -705,17 +708,18 @@ if (typeof module !== 'undefined') module.exports = DigitRec;
   $('showNav').onclick = function () { setNav(false); };
   window.addEventListener('resize', layout);
   window.addEventListener('orientationchange', function () { setTimeout(layout, 250); });
-  window.addEventListener('hashchange', function () {
-    var m = /^#times-(\d+)$/.exec(location.hash); if (m && +m[1] >= 1 && +m[1] <= COUNT) go(+m[1]);
-  });
+  function hashSheet() {
+    if (location.hash === '#blank') return 0;
+    var m = /^#times-(\d+)$/.exec(location.hash); return m && +m[1] >= 1 && +m[1] <= COUNT ? +m[1] : null;
+  }
+  window.addEventListener('hashchange', function () { var h = hashSheet(); if (h !== null) go(h); });
 
   /* ---------- boot ---------- */
   buildNav(); refreshStatus(); syncSwatches();
   $('finger').setAttribute('aria-pressed', String(state.finger));
   canvas.className = state.finger ? 'finger' : '';
-  var m = /^#times-(\d+)$/.exec(location.hash);
-  var start = m ? +m[1] : state.sheet;
-  if (!(start >= 1 && start <= COUNT)) start = 1;
+  var hs = hashSheet(), start = hs !== null ? hs : state.sheet;
+  if (!(start >= 0 && start <= COUNT)) start = 1;
   setNav(!!state.navHidden);
   go(start);
 })();
